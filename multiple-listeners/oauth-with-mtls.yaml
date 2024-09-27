@@ -1,0 +1,83 @@
+apiVersion: platform.confluent.io/v1beta1
+kind: Zookeeper
+metadata:
+  name: zookeeper
+  namespace: confluent
+spec:
+  replicas: 3
+  image:
+    application: confluentinc/cp-zookeeper:7.6.0
+    init: confluentinc/confluent-init-container:2.8.0
+  dataVolumeCapacity: 10Gi
+  logVolumeCapacity: 10Gi
+  authentication:
+    type: mtls
+  tls:
+    secretRef: tls-zookeeper
+---
+apiVersion: platform.confluent.io/v1beta1
+kind: Kafka
+metadata:
+  name: kafka
+  namespace: confluent
+spec:
+  replicas: 3
+  image:
+    application: confluentinc/cp-server:7.6.0
+    init: confluentinc/confluent-init-container:2.8.0
+  dataVolumeCapacity: 10Gi
+  configOverrides:
+    server: #This config override is required for CP 7.0 update to use AclAuthorizer instead of SimpleAclAuthorizer
+      - authorizer.class.name=kafka.security.authorizer.AclAuthorizer
+  tls:
+    secretRef: tls-kafka
+  listeners:
+    custom:
+      - name: customlistener-oauth 
+        port: 9205
+        authentication:
+          type: oauth
+          jaasConfig:
+            secretRef: oauth-jass
+          oauthSettings:
+            groupsClaimName: groups
+            subClaimName: sub  #This config will determine the principal / username from the oauth configs , which will help keep the acls consistent
+            audience:  <client-id>
+            expectedIssuer: https://login.microsoftonline.com/<tenant-id>/v2.0
+            jwksEndpointUri: https://login.microsoftonline.com/<tenant-id>/discovery/v2.0/keys
+            tokenEndpointUri: https://login.microsoftonline.com/<tenant-id>/oauth2/v2.0/token
+        tls:
+          enabled: true
+    internal:
+      authentication:
+        type: mtls
+        principalMappingRules:
+          - RULE:^CN=([a-zA-Z0-9]*).*$/$1/
+      tls:
+        enabled: true
+        # Will use the certificates in the parent secretRef tls-kafka
+    external:
+      authentication:
+        type: mtls
+        principalMappingRules:
+          - RULE:^CN=([a-zA-Z0-9]*).*$/$1/
+      tls:
+        enabled: true
+        # Will use the certificates in the parent secretRef tls-kafka
+  authorization:
+    type: simple
+    superUsers:
+    - User:kafka   # Ensure you have one superUser once you migrate (subClaimName field value mapped to one of the super user)
+  dependencies:
+    zookeeper:
+      endpoint: zookeeper.confluent.svc.cluster.local:2182
+      authentication:
+        type: mtls
+      tls:
+        enabled: true
+  configOverrides:
+    server:
+      - auto.create.topics.enable=true
+      - listener.name.external.oauthbearer.sasl.server.callback.handler.class=org.apache.kafka.common.security.oauthbearer.secured.OAuthBearerValidatorCallbackHandler
+      - listener.name.external.oauthbearer.sasl.jaas.config=org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required;
+---
