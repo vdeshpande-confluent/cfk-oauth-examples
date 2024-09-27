@@ -1,0 +1,93 @@
+apiVersion: platform.confluent.io/v1beta1
+kind: Zookeeper
+metadata:
+  name: zookeeper
+  namespace: confluent
+spec:
+  replicas: 1
+  image:
+    application: confluentinc/cp-zookeeper:7.6.0
+    init: confluentinc/confluent-init-container:2.9.0
+  dataVolumeCapacity: 10Gi
+  logVolumeCapacity: 10Gi
+---
+apiVersion: platform.confluent.io/v1beta1
+kind: Kafka
+metadata:
+  name: broker
+  namespace: confluent
+spec:
+  dependencies:
+    zookeeper:
+      endpoint: zookeeper.confluent.svc.cluster.local:2181
+  dataVolumeCapacity: 10G
+  image:
+    application: docker.io/confluentinc/cp-server:7.7.0
+    init: confluentinc/confluent-init-container:2.9.1
+  replicas: 3
+  listeners:
+    external:
+      authentication:
+        type: oauth
+        jaasConfig:
+          secretRef: oauth-jass
+        oauthSettings:
+          groupsClaimName: groups
+          subClaimName: sub  #This config will determine the principal / username from the oauth configs , which will help keep the acls consistent
+          audience:  <client-id>
+          expectedIssuer: https://login.microsoftonline.com/<tenant-id>/v2.0
+          jwksEndpointUri: https://login.microsoftonline.com/<tenant-id>/discovery/v2.0/keys
+          tokenEndpointUri: https://login.microsoftonline.com/<tenant-id>/oauth2/v2.0/token
+  configOverrides:
+    server:
+      - auto.create.topics.enable=true
+      - listener.name.external.oauthbearer.sasl.server.callback.handler.class=org.apache.kafka.common.security.oauthbearer.secured.OAuthBearerValidatorCallbackHandler
+      - listener.name.external.oauthbearer.sasl.jaas.config=org.apache.kafka.common.security.oauthbearer.OAuthBearerLoginModule required;
+---
+apiVersion: platform.confluent.io/v1beta1
+kind: ControlCenter
+metadata:
+  name: controlcenter
+  namespace: confluent
+spec:
+  replicas: 1
+  image:
+    application: confluentinc/cp-enterprise-control-center:7.7.0
+    init: confluentinc/confluent-init-container:2.9.1
+  dataVolumeCapacity: 10Gi
+  dependencies:
+    kafka:
+      bootstrapEndpoint: broker.confluent.svc.cluster.local:9092
+      authentication:
+        type: oauth
+        jaasConfig:
+          secretRef: oauth-jass
+        oauthSettings:
+          tokenEndpointUri: https://login.microsoftonline.com/<tenant-id>/oauth2/v2.0/token
+          scope: <clientid>/.default
+  externalAccess:
+    type: loadBalancer
+    loadBalancer:
+      domain: oauth.selabs.net
+---
+apiVersion: platform.confluent.io/v1beta1
+kind: KafkaRestProxy
+metadata:
+  name: kafkarestproxy
+  namespace: confluent
+spec:
+  replicas: 1
+  image:
+    application: confluentinc/cp-kafka-rest:7.7.0
+    init: confluentinc/confluent-init-container:2.9.0
+  dependencies:
+    kafka:
+      bootstrapEndpoint: broker.confluent.svc.cluster.local:9092
+      authentication:
+        type: oauth
+        jaasConfig:
+          secretRef: oauth-jass
+        oauthSettings:
+          tokenEndpointUri: https://login.microsoftonline.com/<tenant-id>/oauth2/v2.0/token
+          scope: <clientid>/.default
+---
