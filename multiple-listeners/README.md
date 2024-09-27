@@ -5,20 +5,24 @@ This guide provides step-by-step instructions to deploy Kafka and Zookeeper on K
 ## Prerequisites
 Before you start, ensure the following:
 
-Kubernetes Cluster: A running Kubernetes cluster with access to deploy Confluent components.
-Confluent Operator: The Confluent Platform Operator must be installed in the cluster.
-Azure AD Configuration: Azure AD set up for OAuth with required client ID, tenant ID, and access to the JWKS and token endpoints. [Ref](https://github.com/vdeshpande-confluent/cfk-oauth/blob/main/README.md#setup-oauth)
-TLS Certificates: TLS secrets (tls-zookeeper and tls-kafka) are created in the confluent namespace.[Ref](https://github.com/vdeshpande-confluent/cfk-oauth/blob/main/README.md#create-tls-certificates)
+- Kubernetes Cluster: A running Kubernetes cluster with access to deploy Confluent components.
+
+- Confluent Operator: The Confluent Platform Operator must be installed in the cluster.
+
+- Azure AD Configuration: Azure AD set up for OAuth with required client ID, tenant ID, and access to the JWKS and token endpoints. [Ref](https://github.com/vdeshpande-confluent/cfk-oauth/blob/main/README.md#setup-oauth)
+
+- TLS Certificates: TLS secrets (tls-zookeeper and tls-kafka) are created in the confluent namespace.[Ref](https://github.com/vdeshpande-confluent/cfk-oauth/blob/main/README.md#create-tls-certificates)
+
 Azure AD App Registration: A registered app in Azure AD with the necessary API permissions to generate OAuth tokens.[Ref]()
 
 ## Overview
 This deployment includes:
 
-Zookeeper: A stateful Zookeeper cluster using mTLS for secure communication.
-Kafka: A Kafka cluster with three listeners for different authentication mechanisms:
-Custom Listener (OAuth): Secured with Azure AD OAuth for clients shifted to oauth.
-Internal Listener (mTLS): For internal cluster communication.
-External Listener (mTLS): For external client communication which will use still mtls.
+- Zookeeper: A stateful Zookeeper cluster using mTLS for secure communication.
+- Kafka: A Kafka cluster with three listeners for different authentication mechanisms:
+- Custom Listener (OAuth): Secured with Azure AD OAuth for clients shifted to oauth.
+- Internal Listener (mTLS): For internal cluster communication.
+- External Listener (mTLS): For external client communication which will use still mtls.
 
 ## Custom Listeners
  
